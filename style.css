@@ -563,7 +563,7 @@ h1 .not-word.pulse-red { animation: notPulse 1.2s ease; }
     transform-origin: 50% 60%;
 }
 
-#cutscene img, #cutscene canvas {
+#cutscene canvas {
     width: 100vw;
     height: 100dvh;
     object-fit: cover;
@@ -620,7 +620,7 @@ h1 .not-word.pulse-red { animation: notPulse 1.2s ease; }
     z-index: 2; /* Ensure it is above the canvas */
 }
 
-#cutscene canvas.drive-zoom {
+#cutscene-canvas-wrapper.drive-zoom {
   transform-origin: 50% 50%; /* Center the bounce origin */
   animation: roadBounce 4s linear infinite;
   will-change: transform;
