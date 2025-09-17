@@ -1,4 +1,4 @@
-export function applyPosterizeToImage(canvas, image, levels = 5.0, edgeMix = 0.12) {
+export function applyPosterizeToImage(canvas, image, overlaySource = null, levels = 5.0, edgeMix = 0.12) {
   const gl = canvas.getContext('webgl');
   if (!gl) return;
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -22,6 +22,8 @@ export function applyPosterizeToImage(canvas, image, levels = 5.0, edgeMix = 0.1
   const fsSrc = `
   precision highp float;
   uniform sampler2D uTex0;
+  uniform sampler2D uTex1;
+  uniform bool uHasOverlay;
   uniform vec2 uTexel;
   uniform float uLevels;
   uniform float uEdgeMix;
@@ -95,6 +97,12 @@ export function applyPosterizeToImage(canvas, image, levels = 5.0, edgeMix = 0.1
     vec3 orig = texture2D(uTex0, distortedUV).rgb;
     vec3 finalCol = mix(postEdge, orig, posterizeStrengthMask * 0.5); // blend back original color in land
     
+    if (uHasOverlay) {
+      vec3 overlayCol = texture2D(uTex1, vUV).rgb;
+      // Screen blend mode for a watery/ghostly effect
+      finalCol = 1.0 - (1.0 - finalCol) * (1.0 - overlayCol);
+    }
+
     gl_FragColor = vec4(finalCol, 1.0);
  }`;
 
@@ -130,7 +138,19 @@ export function applyPosterizeToImage(canvas, image, levels = 5.0, edgeMix = 0.1
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
   
+  let tex1 = null;
+  if (overlaySource) {
+      tex1 = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex1);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+
   const uTex0 = gl.getUniformLocation(prog, 'uTex0');
+  const uTex1 = gl.getUniformLocation(prog, 'uTex1');
+  const uHasOverlay = gl.getUniformLocation(prog, 'uHasOverlay');
   const uTexel = gl.getUniformLocation(prog, 'uTexel');
   const uLevels = gl.getUniformLocation(prog, 'uLevels');
   const uEdgeMix = gl.getUniformLocation(prog, 'uEdgeMix');
@@ -146,6 +166,16 @@ export function applyPosterizeToImage(canvas, image, levels = 5.0, edgeMix = 0.1
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.uniform1i(uTex0, 0);
+
+    if (overlaySource && tex1) {
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, tex1);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, overlaySource);
+        gl.uniform1i(uTex1, 1);
+        gl.uniform1i(uHasOverlay, 1);
+    } else {
+        gl.uniform1i(uHasOverlay, 0);
+    }
 
     gl.uniform2f(uTexel, 1.0 / image.naturalWidth, 1.0 / image.naturalHeight);
     gl.uniform1f(uLevels, levels);

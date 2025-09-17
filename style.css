@@ -573,6 +573,22 @@ h1 .not-word.pulse-red { animation: notPulse 1.2s ease; }
     filter: contrast(1.15) saturate(1.05) brightness(0.98);
 }
 
+#cutscene-gif {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: none; /* Initially hidden */
+    z-index: 1; /* Below the scanlines but above canvas wrapper for positioning */
+}
+
+#cutscene-gif.reveal {
+    opacity: 1;
+}
+
+#cutscene-gif.gate-zoom {
+  animation: gateZoom 18s ease-in-out forwards;
+}
+
 #cutscene canvas.fade-in-long {
     transition-duration: 9s; /* Slower fade-in for first scene */
 }
@@ -608,19 +624,6 @@ h1 .not-word.pulse-red { animation: notPulse 1.2s ease; }
   transform-origin: 50% 50%; /* Center the bounce origin */
   animation: roadBounce 4s linear infinite;
   will-change: transform;
-}
-
-#cutscene-gif-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 1; /* Above canvas */
-    pointer-events: none;
-}
-
-#cutscene-gif-overlay img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
 }
 
 #bird-flock {

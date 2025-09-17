@@ -54,23 +54,15 @@ const scenes = [
     }
   },
   { // Scene 3: The Green Gate
-    image: 'cutscene_gate.png',
+    image: 'cutscene_gate.png', // Preloaded but not used on canvas
+    gif: 'cutscene_gate.gif',
     duration: 18000, // Longer, more pensive scene
     animationClass: 'gate-zoom',
-    onStart: (cs, canvas) => {
-      if (posterizeInstance) posterizeInstance.setFogCoverage(0.0); // No fog
-      const gifOverlay = document.getElementById('cutscene-gif-overlay');
-      const gateGif = document.getElementById('gate-gif');
-      if(gifOverlay && gateGif) {
-        gifOverlay.innerHTML = ''; // Clear previous
-        gifOverlay.appendChild(gateGif);
-        gateGif.style.display = 'block';
-      }
+    onStart: () => {
+      // Logic is handled inside transitionToScene
     },
     onEnd: () => {
-      // This is the last scene for now. It could fade to black or loop.
-       const gifOverlay = document.getElementById('cutscene-gif-overlay');
-       if(gifOverlay) gifOverlay.innerHTML = '';
+      // Logic is handled inside transitionToScene
     }
   }
 ];
@@ -94,25 +86,34 @@ async function transitionToScene(sceneIndex) {
   isTransitioning = true;
 
   const canvas = document.getElementById('cutscene-canvas');
+  const gifEl = document.getElementById('cutscene-gif');
   csElement.removeEventListener('click', skipCurrentScene);
   if (autoSkipTimeout) clearTimeout(autoSkipTimeout);
   
+  const prevScene = scenes[currentSceneIndex];
   const isExitingScene2 = currentSceneIndex === 1;
 
+  // Fade out current scene.
+  if (prevScene) {
+      if (prevScene.gif) {
+          gifEl.className = ''; // Fades out the GIF
+      } else {
+          canvas.className = ''; // Fades out the canvas
+      }
+  }
+
   // For scenes other than scene 2, stop animations before fading.
-  if (!isExitingScene2) {
+  if (!isExitingScene2 && currentSceneIndex >= 0) {
     if (zoomRafId) {
         cancelAnimationFrame(zoomRafId);
         zoomRafId = null;
     }
-    if (currentSceneIndex >= 0 && scenes[currentSceneIndex].onEnd) {
+    if (scenes[currentSceneIndex].onEnd) {
         scenes[currentSceneIndex].onEnd();
     }
   }
   
-  // Fade out current scene. For scene 2, zoom continues during this fade.
-  canvas.className = ''; // Clear all classes to trigger fade-out
-  await new Promise(r => setTimeout(r, 2000));
+  await new Promise(r => setTimeout(r, 2000)); // Wait for fade-out
   
   // Now that the screen is black, stop scene 2's zoom and run its cleanup.
   if (isExitingScene2) {
@@ -120,48 +121,61 @@ async function transitionToScene(sceneIndex) {
         cancelAnimationFrame(zoomRafId);
         zoomRafId = null;
     }
-    if (currentSceneIndex >= 0 && scenes[currentSceneIndex].onEnd) {
-        scenes[currentSceneIndex].onEnd();
+    if (prevScene && prevScene.onEnd) {
+        prevScene.onEnd();
     }
   }
 
+  // Full cleanup of previous scene elements
+  if (prevScene) {
+      if(prevScene.gif) {
+          gifEl.style.display = 'none';
+          gifEl.src = '';
+      } else {
+        if (posterizeInstance) {
+            try { posterizeInstance.cleanup(); } catch {}
+            posterizeInstance = null;
+        }
+      }
+  }
+  
   const flockContainer = document.getElementById('bird-flock');
   if (flockContainer && currentSceneIndex === 0) {
       flockContainer.innerHTML = '';
   }
 
-  if (posterizeInstance) {
-    try { posterizeInstance.cleanup(); } catch {}
-    posterizeInstance = null;
-  }
-  
   currentSceneIndex = sceneIndex;
   const scene = scenes[currentSceneIndex];
   
-  const img = preloadedImages[currentSceneIndex];
-  if (!img) {
-      console.error(`Scene ${currentSceneIndex + 1} image not preloaded.`);
-      isTransitioning = false;
-      return;
+  if (scene.gif) { // Handle GIF scene
+    gifEl.src = scene.gif;
+    gifEl.style.display = 'block';
+    requestAnimationFrame(() => {
+        gifEl.classList.add('reveal');
+        if (scene.animationClass) gifEl.classList.add(scene.animationClass);
+        if (scene.onStart) scene.onStart(csElement);
+    });
+  } else { // Handle Canvas scene
+    const img = preloadedImages[currentSceneIndex];
+    if (!img) {
+        console.error(`Scene ${currentSceneIndex + 1} image not preloaded.`);
+        isTransitioning = false;
+        return;
+    }
+    posterizeInstance = applyPosterizeToImage(canvas, img, null, 5.0, 0.12);
+    requestAnimationFrame(() => {
+      canvas.classList.add('reveal');
+      if (scene.fadeInClass) canvas.classList.add(scene.fadeInClass);
+      if (scene.animationClass) canvas.classList.add(scene.animationClass);
+      if (scene.onStart) scene.onStart(csElement, canvas);
+    });
   }
-
-  posterizeInstance = applyPosterizeToImage(canvas, img, 5.0, 0.12);
-
-  requestAnimationFrame(() => {
-    canvas.classList.add('reveal');
-    if (scene.fadeInClass) canvas.classList.add(scene.fadeInClass);
-    if (scene.animationClass) canvas.classList.add(scene.animationClass);
-    
-    if (scene.onStart) {
-      scene.onStart(csElement, canvas);
-    }
-
-    if (currentSceneIndex < scenes.length - 1) {
-      autoSkipTimeout = setTimeout(skipCurrentScene, scene.duration);
-      csElement.addEventListener('click', skipCurrentScene, { once: true });
-    }
-    isTransitioning = false;
-  });
+  
+  if (currentSceneIndex < scenes.length - 1) {
+    autoSkipTimeout = setTimeout(skipCurrentScene, scene.duration);
+    csElement.addEventListener('click', skipCurrentScene, { once: true });
+  }
+  isTransitioning = false;
 }
 
 async function preloadCutsceneAssets() {
@@ -173,16 +187,6 @@ async function preloadCutsceneAssets() {
       img.src = scene.image;
     });
   });
-  // Preload gif too
-  promises.push(new Promise((resolve, reject) => {
-      const img = document.getElementById('gate-gif');
-      if (img.complete) {
-          resolve(img);
-      } else {
-          img.onload = () => resolve(img);
-          img.onerror = (err) => reject(`Failed to load gate.gif: ${err}`);
-      }
-  }));
   return Promise.all(promises);
 }
 
