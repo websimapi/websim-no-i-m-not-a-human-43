@@ -98,9 +98,11 @@ export function applyPosterizeToImage(canvas, image, overlaySource = null, level
     vec3 finalCol = mix(postEdge, orig, posterizeStrengthMask * 0.5); // blend back original color in land
     
     if (uHasOverlay) {
-      vec3 overlayCol = texture2D(uTex1, vUV).rgb;
-      // Screen blend mode for a watery/ghostly effect
-      finalCol = 1.0 - (1.0 - finalCol) * (1.0 - overlayCol);
+      vec4 overlay = texture2D(uTex1, vUV);
+      // Chromakey: treat black pixels from GIF as transparent.
+      // The threshold is low to only affect pure black.
+      float alpha = 1.0 - step(length(overlay.rgb), 0.05);
+      finalCol = mix(finalCol, overlay.rgb, alpha);
     }
 
     gl_FragColor = vec4(finalCol, 1.0);
