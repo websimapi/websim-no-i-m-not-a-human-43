@@ -610,6 +610,19 @@ h1 .not-word.pulse-red { animation: notPulse 1.2s ease; }
   will-change: transform;
 }
 
+#cutscene-gif-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1; /* Above canvas */
+    pointer-events: none;
+}
+
+#cutscene-gif-overlay img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 #bird-flock {
     position: absolute;
     inset: 0;

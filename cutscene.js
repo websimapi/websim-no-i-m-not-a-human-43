@@ -58,11 +58,19 @@ const scenes = [
     duration: 18000, // Longer, more pensive scene
     animationClass: 'gate-zoom',
     onStart: (cs, canvas) => {
-      // For now, it's just a CSS zoom. We can add shader effects here.
       if (posterizeInstance) posterizeInstance.setFogCoverage(0.0); // No fog
+      const gifOverlay = document.getElementById('cutscene-gif-overlay');
+      const gateGif = document.getElementById('gate-gif');
+      if(gifOverlay && gateGif) {
+        gifOverlay.innerHTML = ''; // Clear previous
+        gifOverlay.appendChild(gateGif);
+        gateGif.style.display = 'block';
+      }
     },
     onEnd: () => {
       // This is the last scene for now. It could fade to black or loop.
+       const gifOverlay = document.getElementById('cutscene-gif-overlay');
+       if(gifOverlay) gifOverlay.innerHTML = '';
     }
   }
 ];
@@ -137,20 +145,7 @@ async function transitionToScene(sceneIndex) {
       return;
   }
 
-  let overlaySource = null;
-  if (currentSceneIndex === 2) { // Scene 3: The Gate
-      const video = document.getElementById('gate-gif-video');
-      if (video) {
-          try {
-              await video.play();
-              overlaySource = video;
-          } catch (e) {
-              console.error("Could not play gate gif video:", e);
-          }
-      }
-  }
-
-  posterizeInstance = applyPosterizeToImage(canvas, img, overlaySource, 5.0, 0.12);
+  posterizeInstance = applyPosterizeToImage(canvas, img, 5.0, 0.12);
 
   requestAnimationFrame(() => {
     canvas.classList.add('reveal');
@@ -178,6 +173,16 @@ async function preloadCutsceneAssets() {
       img.src = scene.image;
     });
   });
+  // Preload gif too
+  promises.push(new Promise((resolve, reject) => {
+      const img = document.getElementById('gate-gif');
+      if (img.complete) {
+          resolve(img);
+      } else {
+          img.onload = () => resolve(img);
+          img.onerror = (err) => reject(`Failed to load gate.gif: ${err}`);
+      }
+  }));
   return Promise.all(promises);
 }
 
